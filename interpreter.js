@@ -20,7 +20,7 @@ function interpret(code, globalVars = {}) {
             continue;
         }
 
-        // Пропускаем строки, начинающиеся с ||
+        // Пропускаем комментарии, начинающиеся с ||
         if (line.startsWith('||')) {
             i++;
             continue;

@@ -4,15 +4,22 @@ document.getElementById('runButton').addEventListener('click', function() {
     outputElement.textContent = interpret(code);
 });
 
-function interpret(code) {
+function interpret(code, globalVars = {}) {
     const lines = code.split('\n');
     let output = '';
-    const variables = {};
+    const variables = { ...globalVars };
     const functions = {};
     let i = 0;
 
     while (i < lines.length) {
         const line = lines[i].trim();
+        
+        // Пропускаем строки, начинающиеся с ||
+        if (line.startsWith('||')) {
+            i++;
+            continue;
+        }
+
         const parts = line.split(' ');
         const command = parts[0];
         const args = parts.slice(1);
@@ -35,8 +42,19 @@ function interpret(code) {
                     const condition = evaluateExpression(args.slice(0, args.indexOf('then')).join(' '), variables);
                     if (condition) {
                         const thenIndex = args.indexOf('then');
-                        const thenCommand = args.slice(thenIndex + 1).join(' ');
-                        output += interpret(thenCommand + '\n');
+                        const elseIndex = args.indexOf('else');
+                        if (elseIndex !== -1) {
+                            const thenCommand = args.slice(thenIndex + 1, elseIndex).join(' ');
+                            const elseCommand = args.slice(elseIndex + 1).join(' ');
+                            output += interpret(thenCommand + '\n', variables);
+                        } else {
+                            const thenCommand = args.slice(thenIndex + 1).join(' ');
+                            output += interpret(thenCommand + '\n', variables);
+                        }
+                    } else if (args.includes('else')) {
+                        const elseIndex = args.indexOf('else');
+                        const elseCommand = args.slice(elseIndex + 1).join(' ');
+                        output += interpret(elseCommand + '\n', variables);
                     }
                     break;
                 case 'while':
@@ -48,7 +66,7 @@ function interpret(code) {
                         i++;
                     }
                     while (evaluateExpression(loopCondition, variables)) {
-                        output += interpret(loopBody.join('\n') + '\n');
+                        output += interpret(loopBody.join('\n') + '\n', variables);
                     }
                     break;
                 case 'function':
@@ -75,6 +93,92 @@ function interpret(code) {
                     } else {
                         throw new Error(`Function ${callFunctionName} not defined`);
                     }
+                    break;
+                case 'return':
+                    return evaluateExpression(args.join(' '), variables);
+                case 'array':
+                    if (args.length >= 2 && args[1] === '=') {
+                        const arrayName = args[0];
+                        variables[arrayName] = [];
+                    } else {
+                        throw new Error('Invalid array declaration');
+                    }
+                    break;
+                case 'push':
+                    if (args.length >= 2) {
+                        const arrayName = args[0];
+                        if (Array.isArray(variables[arrayName])) {
+                            variables[arrayName].push(evaluateExpression(args.slice(1).join(' '), variables));
+                        } else {
+                            throw new Error(`Variable ${arrayName} is not an array`);
+                        }
+                    } else {
+                        throw new Error('Invalid push operation');
+                    }
+                    break;
+                case 'get':
+                    if (args.length === 2) {
+                        const arrayName = args[0];
+                        const index = evaluateExpression(args[1], variables);
+                        if (Array.isArray(variables[arrayName])) {
+                            output += variables[arrayName][index] + '\n';
+                        } else {
+                            throw new Error(`Variable ${arrayName} is not an array`);
+                        }
+                    } else {
+                        throw new Error('Invalid get operation');
+                    }
+                    break;
+                case 'concat':
+                    if (args.length >= 4 && args[1] === '=') {
+                        const varName = args[0];
+                        const str1 = evaluateExpression(args[2], variables);
+                        const str2 = evaluateExpression(args[3], variables);
+                        variables[varName] = str1 + str2;
+                    } else {
+                        throw new Error('Invalid concat operation');
+                    }
+                    break;
+                case 'length':
+                    if (args.length >= 3 && args[1] === '=') {
+                        const varName = args[0];
+                        const strOrArray = evaluateExpression(args[2], variables);
+                        variables[varName] = strOrArray.length;
+                    } else {
+                        throw new Error('Invalid length operation');
+                    }
+                    break;
+                case 'slice':
+                    if (args.length >= 4 && args[1] === '=') {
+                        const varName = args[0];
+                        const strOrArray = evaluateExpression(args[2], variables);
+                        const start = evaluateExpression(args[3], variables);
+                        const end = args.length === 5 ? evaluateExpression(args[4], variables) : strOrArray.length;
+                        variables[varName] = strOrArray.slice(start, end);
+                    } else {
+                        throw new Error('Invalid slice operation');
+                    }
+                    break;
+                case 'input':
+                    if (args.length === 2 && args[1] === '=') {
+                        const varName = args[0];
+                        variables[varName] = prompt('Enter a value:');
+                    } else {
+                        throw new Error('Invalid input operation');
+                    }
+                    break;
+                case 'indexof':
+                    if (args.length >= 3 && args[1] === '=') {
+                        const varName = args[0];
+                        const strOrArray = evaluateExpression(args[2], variables);
+                        const searchValue = evaluateExpression(args[3], variables);
+                        variables[varName] = strOrArray.indexOf(searchValue);
+                    } else {
+                        throw new Error('Invalid indexof operation');
+                    }
+                    break;
+                case '#':
+                    // Это комментарий, игнорируем его
                     break;
                 default:
                     throw new Error(`Unknown command: ${command}`);

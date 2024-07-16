@@ -14,6 +14,12 @@ function interpret(code, globalVars = {}) {
     while (i < lines.length) {
         const line = lines[i].trim();
         
+        // Пропускаем пустые строки
+        if (line === '') {
+            i++;
+            continue;
+        }
+
         // Пропускаем строки, начинающиеся с ||
         if (line.startsWith('||')) {
             i++;
@@ -176,9 +182,6 @@ function interpret(code, globalVars = {}) {
                     } else {
                         throw new Error('Invalid indexof operation');
                     }
-                    break;
-                case '#':
-                    // Это комментарий, игнорируем его
                     break;
                 default:
                     throw new Error(`Unknown command: ${command}`);

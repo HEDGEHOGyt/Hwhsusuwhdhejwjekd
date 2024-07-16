@@ -203,7 +203,7 @@ function evaluateExpression(expression, variables) {
         } else if (variables.hasOwnProperty(token)) {
             return variables[token];
         } else {
-            throw new Error(`Undefined variable: ${token}`);
+            return token;
         }
     }
 
